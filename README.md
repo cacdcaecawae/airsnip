@@ -24,7 +24,7 @@
 | 贴图 | `Ctrl`+滚轮透明度、`Ctrl+F3` 边框 | `⌘`+滚轮透明度、`⌃F3` 边框；也可双指捏合缩放 |
 | 多显示器 | 选区可跨屏 | 每块屏各自冻结，选区在一块屏内（同系统 `⌘⇧4`） |
 | 窗口识别 | 暂无 | 鼠标停在窗口上自动高亮，单击选中；桌面空白处单击 = 全屏；`⌘A` 全选 |
-| 长截图 | `Enter` 完成、`Ctrl+Z` 撤销 | `Return` 完成、`⌘Z` 撤销、`Esc` 取消 |
+| 长截图 | `Enter` 完成、`Ctrl+S` 另存为、`Ctrl+Z` 撤销 | `Return` 完成、`⌘S` 另存为、`⌘Z` 撤销、`Esc` 取消 |
 
 ```bash
 scripts/package-macos.sh                         # Rust 静态库 → swift build → dist/AirSnip.app（只需 Command Line Tools）

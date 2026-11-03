@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // 长截图（LNG-1/3/6/7）：视口 = 截图时的选区。用户自己滚动页面，每 90ms 抓一帧视口交核心拼接；
 // 视口外一圈 2px 蓝框（不挡鼠标）、视口下方（放不下则上方）状态条、旁边的拼接预览。
-// Return 完成（复制 + 保存到默认目录）、Esc 取消、⌘Z 撤销：会话期间注册为全局热键，
-// 焦点一直留在被滚动的应用。定时拍只在会话期间存在。
+// Return 完成（复制 + 保存到默认目录）、⌘S 另存为（复制 + 存到所选位置）、Esc 取消、⌘Z 撤销：
+// 会话期间注册为全局热键，焦点一直留在被滚动的应用。定时拍只在会话期间存在。
 
 import AppKit
 import CAirsnip
@@ -56,19 +56,25 @@ final class LongshotController {
         config.captureResolution = .best
 
         bar.onUndo = { [weak self] in self?.undo() }
+        bar.onSaveAs = { [weak self] in self?.saveAs() }
         bar.onDone = { [weak self] in self?.finish() }
         bar.onCancel = { [weak self] in self?.end() }
         panels.forEach { $0.orderFrontRegardless() }
+        registerKeys()
+        Task { @MainActor in await start() }
+    }
 
+    /// 会话热键（另存为对话框开着时注销，Return / Esc 留给对话框）。
+    private func registerKeys() {
         let hot: [(UInt32, UInt32, () -> Void)] = [
             (0x24, 0, { [weak self] in self?.finish() }),  // Return
             (0x35, 0, { [weak self] in self?.end() }),  // Esc
             (0x06, 0x100, { [weak self] in self?.undo() }),  // ⌘Z
+            (0x01, 0x100, { [weak self] in self?.saveAs() }),  // ⌘S
         ]
         for (i, (key, mods, action)) in hot.enumerated() {
             if let k = try? HotKey(keyCode: key, modifiers: mods, id: 10 + UInt32(i), handler: action) { keys.append(k) }
         }
-        Task { @MainActor in await start() }
     }
 
     /// 取抓屏范围（排除本应用窗口：状态条、边框、预览、贴图），然后每 90ms 一拍直到完成或取消。
@@ -87,6 +93,10 @@ final class LongshotController {
             return
         }
         guard !ended else { return }  // 准备期间已按 Esc
+        await run()
+    }
+
+    @MainActor private func run() async {
         while ticking, !ended {
             tick()
             try? await Task.sleep(nanoseconds: 90_000_000)
@@ -123,7 +133,8 @@ final class LongshotController {
             return
         }
         refresh()
-        if code == 1 { complete() }  // 已达高度上限
+        // 已达高度上限：拼接中直接输出；完成 / 另存为的补抓帧由调用方收尾（另存为仍要弹对话框）
+        if code == 1, ticking { complete() }
     }
 
     private func refresh() {
@@ -139,7 +150,7 @@ final class LongshotController {
 
     /// 完成：等在途的一帧，再补抓一帧（滚动后立刻按 Return 时最后一屏还没拍到），然后输出。
     private func finish() {
-        guard !ended, filter != nil else { return }
+        guard !ended, filter != nil, ticking else { return }
         ticking = false
         let pending = inflight
         Task { @MainActor in
@@ -149,12 +160,45 @@ final class LongshotController {
         }
     }
 
-    /// 输出：复制到剪贴板 + 保存 PNG 到默认目录（与 Windows 一致）。
-    private func complete() {
+    /// 另存为（OUT-2）：同完成先停拍并补抓最后一帧，再弹另存为对话框（格式、命名模板、上次的目录）；
+    /// 选好位置就复制并存到那里，取消则恢复热键继续拼接（已拼的内容还在）。
+    private func saveAs() {
+        guard !ended, filter != nil, ticking else { return }
+        ticking = false
+        keys.removeAll()
+        let pending = inflight
+        Task { @MainActor in
+            await pending?.value
+            await captureOnce()
+            guard !ended else { return }  // 补抓时失败或已达高度上限
+            var name: UnsafePointer<CChar>?
+            var ext: UnsafePointer<CChar>?
+            var dir: UnsafePointer<CChar>?
+            airsnip_longshot_save_defaults(ls, &name, &ext, &dir)
+            let url = SaveDialog.run(
+                dir: dir.map { String(cString: $0) }, name: name.map { String(cString: $0) } ?? "airsnip.png",
+                ext: ext.map { String(cString: $0) } ?? "png")
+            guard !ended else { return }
+            NSApp.hide(nil)  // 对话框激活了本应用：把焦点还给被滚动的应用
+            if let url {
+                complete(path: url.path)
+            } else {
+                registerKeys()
+                ticking = true
+                await run()
+            }
+        }
+    }
+
+    /// 输出：复制到剪贴板 + 保存（`path` 为 nil 时 PNG 存默认目录，与 Windows 一致）。
+    private func complete(path: String? = nil) {
         guard !ended else { return }
         var png: UnsafePointer<UInt8>?
         var len = 0
-        let code = airsnip_longshot_finish(ls, Float(req.display.scale), &png, &len)
+        let scale = Float(req.display.scale)
+        let code =
+            path.map { $0.withCString { airsnip_longshot_finish(ls, scale, $0, &png, &len) } }
+            ?? airsnip_longshot_finish(ls, scale, nil, &png, &len)
         if let png { Clipboard.writePNG(Data(bytes: png, count: len)) }
         let err = code != 0 ? String(cString: airsnip_last_error()) : nil
         end()

@@ -53,6 +53,8 @@ private final class Action: NSObject {
 final class SettingsWindow: NSWindowController, NSWindowDelegate {
     private var s = AsSettings()
     private var actions: [Action] = []
+    /// 快捷键页的录制按钮与清空按钮（清空、恢复默认后一并刷新）。
+    private var keyRows: [(Shortcut, ShortcutField, NSButton)] = []
     private var login: NSButton?
     private let onHotKeysChanged: () -> Void
     private let suspendHotKeys: () -> Void
@@ -107,8 +109,21 @@ final class SettingsWindow: NSWindowController, NSWindowDelegate {
     }
 
     private func shortcuts() -> [[NSView]] {
-        var rows: [[NSView]] = Shortcut.allCases.map { [label($0.name), field($0)] }
-        rows.append([NSGridCell.emptyContentView, note("截图、贴图在任何地方都能用；不带修饰键会抢占其他程序的按键，建议加 ⌃ / ⌥ / ⌘。\n贴图边框在贴图窗口内生效；长截图与工具键在截图时生效。")])
+        var rows: [[NSView]] = Shortcut.allCases.map { k in
+            let field = field(k)
+            let clear = bind(NSButton(title: "", target: nil, action: nil)) { [weak self] _ in self?.clear(k) }
+            clear.image = NSImage(systemSymbolName: "xmark.circle", accessibilityDescription: "清空")
+            clear.isBordered = false
+            clear.toolTip = "清空为「未设置」"
+            clear.isEnabled = field.code != AIRSNIP_UNBOUND
+            keyRows.append((k, field, clear))
+            let cell = NSStackView(views: [field, clear])
+            cell.spacing = 6
+            return [label(k.name), cell]
+        }
+        let restore = bind(NSButton(title: "恢复默认", target: nil, action: nil)) { [weak self] _ in self?.restoreDefaults() }
+        rows.append([NSGridCell.emptyContentView, restore])
+        rows.append([NSGridCell.emptyContentView, note("截图、贴图在任何地方都能用；不带修饰键会抢占其他程序的按键，建议加 ⌃ / ⌥ / ⌘。\n贴图边框在贴图窗口内生效；长截图与工具键在截图时生效。\n点 ⓧ 清空不用的快捷键；截图、贴图清空后可从菜单栏图标使用。")])
         return rows
     }
 
@@ -219,9 +234,47 @@ final class SettingsWindow: NSWindowController, NSWindowDelegate {
             s[keyPath: k.code] = code
             if let m = k.mods { s[keyPath: m] = mods }
             persist()
+            keyRows.first { $0.0 == k }?.2.isEnabled = true
             return true
         }
         return f
+    }
+
+    /// 清空为「未设置」（SYS-2）：截图 / 贴图清空后只能从菜单栏使用，先确认。
+    private func clear(_ k: Shortcut) {
+        // 先结束别的栏的录制：否则这里重新注册热键后，录制中按下的键会直接触发截图
+        window?.makeFirstResponder(nil)
+        if k == .shot || k == .pin {
+            let menu = k == .shot ? "截图" : "从剪贴板贴图"
+            guard Alerts.confirm("清空后「\(k.name)」不再有快捷键，只能点菜单栏图标里的「\(menu)」。确定清空？", ok: "清空")
+            else { return }
+        }
+        s[keyPath: k.code] = AIRSNIP_UNBOUND
+        if let m = k.mods { s[keyPath: m] = 0 }
+        persist()
+        refreshKeys()
+        onHotKeysChanged()
+    }
+
+    /// 恢复默认（SYS-2）：覆盖全部快捷键，先确认。
+    private func restoreDefaults() {
+        guard Alerts.confirm("把全部快捷键恢复为默认值？你改过的设置会被覆盖。", ok: "恢复默认") else { return }
+        var d = AsSettings()
+        airsnip_settings_defaults(&d)
+        for k in Shortcut.allCases {
+            s[keyPath: k.code] = d[keyPath: k.code]
+            if let m = k.mods { s[keyPath: m] = d[keyPath: m] }
+        }
+        persist()
+        refreshKeys()
+        onHotKeysChanged()
+    }
+
+    private func refreshKeys() {
+        for (k, field, clear) in keyRows {
+            field.show(code: s[keyPath: k.code], mods: k.mods.map { s[keyPath: $0] } ?? 0)
+            clear.isEnabled = field.code != AIRSNIP_UNBOUND
+        }
     }
 
     @discardableResult
@@ -235,11 +288,12 @@ final class SettingsWindow: NSWindowController, NSWindowDelegate {
 
     // MARK: 行为
 
-    /// 冲突检查（同 Windows）：与全局热键比「键 + 修饰」，与覆盖层内的键只比键码。
+    /// 冲突检查（同 Windows）：与全局热键比「键 + 修饰」，与覆盖层内的键只比键码；未设置的项不参与。
     private func conflict(_ k: Shortcut, _ code: UInt32, _ mods: UInt32) -> String? {
         Shortcut.allCases.first { o in
             guard o != k else { return false }
             let oc = s[keyPath: o.code]
+            guard oc != AIRSNIP_UNBOUND else { return false }
             let om: UInt32 = o.mods.map { s[keyPath: $0] } ?? 0
             return o.withMods ? (oc == code && om == mods) : oc == code
         }?.name

@@ -3,7 +3,8 @@
 //! 核心的帧源是同步拉取，这里用「待取帧」槽位衔接）。所有函数只在主线程调用。
 
 use std::cell::RefCell;
-use std::ffi::{CString, c_char};
+use std::ffi::{CStr, CString, c_char};
+use std::path::PathBuf;
 use std::rc::Rc;
 
 use airsnip_core::longshot::session::{Session, Source};
@@ -20,10 +21,11 @@ pub struct AsLongshot {
     /// 视口像素尺寸（推入的帧必须一致）。
     size: (u32, u32),
     frame: Rc<RefCell<Option<Vec<u8>>>>,
-    /// 借出的缩略图 / 提示 / PNG（下次同类调用或释放前有效）。
+    /// 借出的缩略图 / 提示 / PNG / 另存为预填值（下次同类调用或释放前有效）。
     thumb: Option<Pixmap>,
     hint: CString,
     png: Vec<u8>,
+    defaults: [CString; 3],
 }
 
 /// 帧源：取走 Swift 推入的那一帧。
@@ -54,6 +56,7 @@ pub extern "C" fn airsnip_longshot_new(w: u32, h: u32) -> *mut AsLongshot {
             thumb: None,
             hint: CString::default(),
             png: Vec::new(),
+            defaults: Default::default(),
         }));
         Ok(())
     });
@@ -144,31 +147,84 @@ pub unsafe extern "C" fn airsnip_longshot_thumbnail(p: *mut AsLongshot, max_w: u
     l.thumb.as_ref().map_or(empty, as_image)
 }
 
-/// 完成（LNG-6）：拼接结果编码为 PNG（带 Retina 分辨率），保存到默认截图目录，
-/// 并借出 PNG 字节供写剪贴板（`out_png` / `out_len`，释放句柄前有效）。
+/// 另存为对话框的预填值（OUT-2，同截图另存为）：文件名按命名模板（含扩展名）、格式为上次保存的
+/// （首次 PNG）、初始目录为上次保存的目录（不存在时为默认截图目录）。指针在下次调用或释放句柄前有效。
+///
+/// # Safety
+/// `p` 为有效句柄或 NULL；`name`、`ext`、`dir` 指向可写位置。
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn airsnip_longshot_save_defaults(
+    p: *mut AsLongshot,
+    name: *mut *const c_char,
+    ext: *mut *const c_char,
+    dir: *mut *const c_char,
+) {
+    let Some(l) = (unsafe { ls(p) }) else { return };
+    let cfg = Config::load();
+    let e = cfg.last_save_ext.unwrap_or_else(|| "png".into());
+    let d = cfg
+        .last_save_dir
+        .map(PathBuf::from)
+        .filter(|d| d.is_dir())
+        .unwrap_or_else(output::default_save_dir);
+    let n = format!("{}.{e}", output::base_name(cfg.name_style));
+    l.defaults = [n, e, d.to_string_lossy().into_owned()].map(|v| CString::new(v).unwrap_or_default());
+    unsafe {
+        *name = l.defaults[0].as_ptr();
+        *ext = l.defaults[1].as_ptr();
+        *dir = l.defaults[2].as_ptr();
+    }
+}
+
+/// 完成（LNG-6）：拼接结果编码为 PNG（带 Retina 分辨率）并借出供写剪贴板（`out_png` / `out_len`，
+/// 释放句柄前有效），然后保存：`path` 为 NULL 时以 PNG 存到默认截图目录；否则按扩展名存到 `path`
+/// （另存为，OUT-2），并记住本次的格式与目录，不再往默认目录另写一份。
 /// 编码成功但保存失败时仍借出 PNG，返回非 0（详情见 `airsnip_last_error`）。
 ///
 /// # Safety
-/// `p` 为有效句柄或 NULL；`out_png`、`out_len` 指向可写位置。
+/// `p` 为有效句柄或 NULL；`path` 为 NULL 或 UTF-8 C 字符串；`out_png`、`out_len` 指向可写位置。
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn airsnip_longshot_finish(
     p: *mut AsLongshot,
     scale: f32,
+    path: *const c_char,
     out_png: *mut *const u8,
     out_len: *mut usize,
 ) -> i32 {
     let Some(l) = (unsafe { ls(p) }) else { return -1 };
     guard(|| {
-        l.png = output::encode_png_scaled(&l.session.result()?, scale)?;
+        let img = l.session.result()?;
+        l.png = output::encode_png_scaled(&img, scale)?;
         unsafe {
             *out_png = l.png.as_ptr();
             *out_len = l.png.len();
+        }
+        if !path.is_null() {
+            let path = PathBuf::from(
+                unsafe { CStr::from_ptr(path) }
+                    .to_str()
+                    .map_err(|_| "保存路径不是有效的 UTF-8")?,
+            );
+            remember_save(&path);
+            return output::save_file(&img, &path);
         }
         let dir = output::default_save_dir();
         std::fs::create_dir_all(&dir).map_err(|e| format!("保存失败：无法创建目录 {}：{e}", dir.display()))?;
         let path = dir.join(output::timestamped_filename("png"));
         std::fs::write(&path, &l.png).map_err(|e| format!("保存失败：{e}"))
     })
+}
+
+/// 记住另存为的格式与目录（OUT-2）：下次另存为对话框默认选中、定位到这里。
+fn remember_save(path: &std::path::Path) {
+    let mut cfg = Config::load();
+    if let Some(e) = path.extension().and_then(|e| e.to_str()) {
+        cfg.last_save_ext = Some(e.to_ascii_lowercase());
+    }
+    if let Some(d) = path.parent() {
+        cfg.last_save_dir = Some(d.to_string_lossy().into_owned());
+    }
+    cfg.save();
 }
 
 #[cfg(test)]

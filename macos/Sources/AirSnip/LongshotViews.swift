@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// 长截图状态条与预览（LNG-3/6/7）：都放在屏幕可用区域内。状态条在视口下方（放不下则上方），[提示 …… 撤销 完成 取消]；
+// 长截图状态条与预览（LNG-3/6/7）：都放在屏幕可用区域内。状态条在视口下方（放不下则上方），[提示 …… 撤销 另存为 完成 取消]；
 // 预览在视口右侧（放不下则左侧）显示拼接结果缩略图，底边与视口底边对齐，背景透明，不挡鼠标。
 
 import AppKit
@@ -7,11 +7,12 @@ import CAirsnip
 
 final class LongshotBar: FloatingPanel {
     var onUndo: (() -> Void)?
+    var onSaveAs: (() -> Void)?
     var onDone: (() -> Void)?
     var onCancel: (() -> Void)?
     private let label = NSTextField(labelWithString: "")
     private var undo: NSButton!
-    private static let defaultHint = "滚动页面 · Return 完成"
+    private static let defaultHint = "滚动页面 · Return 完成 · ⌘S 另存为"
 
     /// `area`：屏幕可用区域（不含菜单栏与 Dock）。下方优先，其次上方；
     /// 上下都放不下（视口几乎占满屏幕）时放进视口底部，状态条不会被拍进去（抓帧排除本应用）。
@@ -36,7 +37,8 @@ final class LongshotBar: FloatingPanel {
         label.lineBreakMode = .byTruncatingTail
         label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         let buttons = [
-            ("arrow.uturn.backward", "撤销最后一段（⌘Z）"), ("checkmark", "完成（Return）"), ("xmark", "取消（Esc）"),
+            ("arrow.uturn.backward", "撤销最后一段（⌘Z）"), ("square.and.arrow.down", "另存为（⌘S）"),
+            ("checkmark", "完成（Return）"), ("xmark", "取消（Esc）"),
         ].enumerated().map { i, item -> NSButton in
             let b = NSButton(
                 image: NSImage(systemSymbolName: item.0, accessibilityDescription: item.1) ?? NSImage(),
@@ -63,7 +65,7 @@ final class LongshotBar: FloatingPanel {
     }
 
     @objc private func tapped(_ sender: NSButton) {
-        [onUndo, onDone, onCancel][sender.tag]?()
+        [onUndo, onSaveAs, onDone, onCancel][sender.tag]?()
     }
 }
 

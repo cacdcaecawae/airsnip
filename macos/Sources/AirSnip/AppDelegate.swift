@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// 菜单栏应用壳（SYS-1/SYS-2/SYS-3）：菜单栏图标与菜单（截图 / 设置 / 退出）、全局热键（截图、剪贴板贴图）、
+// 菜单栏应用壳（SYS-1/SYS-2/SYS-3）：菜单栏图标与菜单（截图 / 从剪贴板贴图 / 设置 / 退出）、全局热键（截图、剪贴板贴图）、
 // 截图流程（权限 → 抓屏 → 覆盖层 → 长截图）。待机时没有定时器与轮询，只等热键与菜单事件。
 // 再次打开 AirSnip（双击 App）时打开设置窗口，同 Windows 再次启动时唤起已运行的实例。
 
@@ -9,6 +9,8 @@ import CAirsnip
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private let shotItem = NSMenuItem(title: "截图", action: #selector(startCapture), keyEquivalent: "")
+    /// 快捷键可以清空（SYS-2），清空后截图 / 贴图只剩菜单这条路，所以菜单里两项都要有。
+    private let pinItem = NSMenuItem(title: "从剪贴板贴图", action: #selector(pinFromClipboard), keyEquivalent: "")
     private var hotKeys: [HotKey] = []
     private var settings: SettingsWindow?
     private var overlay: OverlayController?
@@ -30,7 +32,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         hotKeys.removeAll()
         var s = AsSettings()
         airsnip_settings_load(&s)
-        shotItem.title = "截图（\(hotKeyLabel(keyCode: s.shot_key, modifiers: s.shot_mods))）"
+        shotItem.title = menuTitle("截图", s.shot_key, s.shot_mods)
+        pinItem.title = menuTitle("从剪贴板贴图", s.pin_key, s.pin_mods)
         var failed: [String] = []
         register("截图", s.shot_key, s.shot_mods, id: 1, &failed) { [weak self] in self?.startCapture() }
         // 截图进行中：贴当前选区（同 Windows 截图时按 F3）；否则贴剪贴板里的图片
@@ -43,6 +46,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             Alerts.show("快捷键注册失败，可能已被其他程序占用：\n\(failed.joined(separator: "\n"))\n可在设置 › 快捷键中更换；截图仍可点菜单栏图标。")
         }
     }
+
+    /// 菜单项标题带上快捷键；未设置时只显示名称。
+    private func menuTitle(_ name: String, _ key: UInt32, _ mods: UInt32) -> String {
+        key == AIRSNIP_UNBOUND ? name : "\(name)（\(hotKeyLabel(keyCode: key, modifiers: mods))）"
+    }
+
+    @objc private func pinFromClipboard() { Pins.fromClipboard() }
 
     @objc private func openSettings() {
         if settings == nil {
@@ -60,6 +70,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         _ action: @escaping () -> Void
     ) {
         let label = hotKeyLabel(keyCode: key, modifiers: mods)
+        // 已清空（SYS-2）：不注册，也不算注册失败
+        guard key != AIRSNIP_UNBOUND else {
+            NSLog("[airsnip] %@热键未设置", name)
+            return
+        }
         do {
             hotKeys.append(try HotKey(keyCode: key, modifiers: mods, id: id, handler: action))
             NSLog("[airsnip] %@热键 %@ 已注册", name, label)
@@ -76,6 +91,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let menu = NSMenu()
         shotItem.target = self
         menu.addItem(shotItem)
+        pinItem.target = self
+        menu.addItem(pinItem)
         let prefs = NSMenuItem(title: "设置…", action: #selector(openSettings), keyEquivalent: ",")
         prefs.target = self
         menu.addItem(prefs)

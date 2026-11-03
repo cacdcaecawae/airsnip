@@ -147,8 +147,11 @@ int32_t airsnip_longshot_can_undo(AsLongshot *ls);
 void airsnip_longshot_undo(AsLongshot *ls);
 /// 拼接结果缩略图（还没有内容时宽高为 0），下次调用前有效。
 AsImage airsnip_longshot_thumbnail(AsLongshot *ls, uint32_t max_w, uint32_t max_h);
-/// 完成：保存 PNG 到默认目录，并借出 PNG 字节写剪贴板（释放前有效）；保存失败仍借出 PNG 并返回非 0。
-int32_t airsnip_longshot_finish(AsLongshot *ls, float scale, const uint8_t **out_png, size_t *out_len);
+/// 另存为对话框预填值：文件名（含扩展名，按命名模板）、默认格式、初始目录，下次调用前有效。
+void airsnip_longshot_save_defaults(AsLongshot *ls, const char **name, const char **ext, const char **dir);
+/// 完成：借出 PNG 字节写剪贴板（释放前有效），再保存——`path` 为 NULL 时 PNG 存默认目录，
+/// 否则按扩展名存到 `path` 并记住格式与目录；保存失败仍借出 PNG 并返回非 0。
+int32_t airsnip_longshot_finish(AsLongshot *ls, float scale, const char *path, const uint8_t **out_png, size_t *out_len);
 
 // ---------------------------------------------------------------- 设置
 
@@ -160,7 +163,13 @@ typedef struct {
     uint32_t tool_rect, tool_arrow, tool_text, tool_blur, tool_highlight, tool_glow;
 } AsSettings;
 
+/// 快捷键「未设置」（SYS-2）：键码为此值时不注册、不参与冲突检测，显示为「未设置」。
+/// （macOS 的键码 0 是 A 键，所以不用 0。）
+#define AIRSNIP_UNBOUND 0xFFFFFFFFu
+
 void airsnip_settings_load(AsSettings *out);
+/// 默认设置（「恢复默认」快捷键用）。
+void airsnip_settings_defaults(AsSettings *out);
 /// 立即写入配置文件；全局热键由调用方重新注册。
 int32_t airsnip_settings_save(const AsSettings *s);
 
