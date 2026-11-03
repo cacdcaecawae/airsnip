@@ -134,8 +134,9 @@ final class SettingsWindow: NSWindowController, NSWindowDelegate {
             [NSGridCell.emptyContentView, title],
             [label("版本"), label("v\(String(cString: airsnip_version())) · GPL-3.0")],
             [label("原作者"), link("冰冻大西瓜（@bd-dxg）", "https://github.com/bd-dxg")],
-            [label("项目地址"), link("github.com/bd-dxg/airsnip", "https://github.com/bd-dxg/airsnip")],
-            [label("第三方许可"), link("查看清单", "https://github.com/bd-dxg/airsnip/blob/main/THIRD-PARTY.md")],
+            [label("项目地址"), link("github.com/cacdcaecawae/airsnip", "https://github.com/cacdcaecawae/airsnip")],
+            [label("原版（Windows）"), link("github.com/bd-dxg/airsnip", "https://github.com/bd-dxg/airsnip")],
+            [label("第三方许可"), link("查看清单", "https://github.com/cacdcaecawae/airsnip/blob/main/THIRD-PARTY.md")],
         ]
         if let url = Bundle.main.url(forResource: "reward-code", withExtension: "png"), let img = NSImage(contentsOf: url) {
             let view = NSImageView(image: img)
