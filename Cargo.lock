@@ -41,7 +41,7 @@ dependencies = [
 
 [[package]]
 name = "airsnip-macos"
-version = "0.7.0"
+version = "0.7.1"
 dependencies = [
  "airsnip-core",
  "tiny-skia",

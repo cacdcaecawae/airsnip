@@ -2,6 +2,7 @@
 // 全局热键（SYS-2）：Carbon RegisterEventHotKey。不需要辅助功能权限；
 // 组合已被其他程序注册时返回错误码，由调用方提示冲突。
 
+import CAirsnip
 import Carbon.HIToolbox
 
 final class HotKey {
@@ -52,6 +53,7 @@ struct HotKeyError: Error {
 
 /// 热键的显示文本（如 ⌃⌥A）：修饰位 + 字母/数字键名；未知键码显示为 #键码。
 func hotKeyLabel(keyCode: UInt32, modifiers: UInt32) -> String {
+    if keyCode == AIRSNIP_UNBOUND { return "未设置" }
     var s = ""
     if modifiers & UInt32(controlKey) != 0 { s += "⌃" }
     if modifiers & UInt32(optionKey) != 0 { s += "⌥" }

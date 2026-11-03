@@ -113,6 +113,17 @@ pub unsafe extern "C" fn airsnip_settings_load(out: *mut AsSettings) {
     }
 }
 
+/// 默认设置（设置窗口「恢复默认」快捷键用，SYS-2）。
+///
+/// # Safety
+/// `out` 为 NULL 或指向可写的 `AsSettings`。
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn airsnip_settings_defaults(out: *mut AsSettings) {
+    if let Some(out) = unsafe { out.as_mut() } {
+        *out = AsSettings::from(&Config::default());
+    }
+}
+
 /// 保存设置（立即写入配置文件；下次截图、贴图即生效，全局热键由调用方重新注册）。
 ///
 /// # Safety
@@ -147,5 +158,14 @@ mod tests {
         assert_eq!(back.ui_scale, UiScale::Auto);
         assert_eq!(back.name_style, NameStyle::Date);
         assert_eq!(back.pin_position, PinPosition::Center);
+    }
+
+    /// 头文件里的 `AIRSNIP_UNBOUND` 与核心一致（macOS 的 0 是 A 键，不能当「未设置」）。
+    #[test]
+    fn unbound_matches_header() {
+        assert_eq!(airsnip_core::settings::UNBOUND, 0xFFFF_FFFF);
+        let mut d = AsSettings::default();
+        unsafe { airsnip_settings_defaults(&mut d) };
+        assert_ne!(d.shot_key, airsnip_core::settings::UNBOUND, "默认截图键应已绑定");
     }
 }

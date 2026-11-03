@@ -69,6 +69,12 @@ final class ShortcutField: NSButton {
         onEnd?()
     }
 
+    /// 外部改了键位（清空、恢复默认）后更新显示。
+    func show(code: UInt32, mods: UInt32) {
+        (self.code, self.mods) = (code, mods)
+        refresh()
+    }
+
     private func refresh() {
         title = recording ? "按下新按键…（Esc 取消）" : hotKeyLabel(keyCode: code, modifiers: mods)
     }

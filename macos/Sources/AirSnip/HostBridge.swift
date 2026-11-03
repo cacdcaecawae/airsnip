@@ -120,6 +120,16 @@ enum Alerts {
         _ = runAbove(alert.window) { alert.runModal() }
     }
 
+    /// 是 / 否确认（破坏性操作前用）：点 `ok` 按钮返回 true。
+    static func confirm(_ message: String, ok: String) -> Bool {
+        let alert = NSAlert()
+        alert.messageText = "AirSnip"
+        alert.informativeText = message
+        alert.addButton(withTitle: ok)
+        alert.addButton(withTitle: "取消")
+        return runAbove(alert.window) { alert.runModal() } == .alertFirstButtonReturn
+    }
+
     /// 以模态方式显示 `window`，并保证它在覆盖层之上。
     /// runModal 会把窗口层级重置为模态面板级（8），事先设的 level 无效：窗口被压在覆盖层下，
     /// 看不见也点不到，模态循环又挡住覆盖层的事件，表现为卡死。所以进入模态循环后再抬层级。

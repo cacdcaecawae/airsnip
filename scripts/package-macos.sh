@@ -8,7 +8,8 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-VERSION=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)
+# macOS 版单独编号（与关于页的 airsnip_version 同源）；根包 Cargo.toml 是 Windows 版，版本跟随原版
+VERSION=$(sed -n 's/^version = "\(.*\)"/\1/p' crates/airsnip-macos/Cargo.toml | head -1)
 SIGN_ID="${AIRSNIP_SIGN_ID:--}"
 APP=dist/AirSnip.app
 
