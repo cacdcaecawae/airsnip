@@ -67,26 +67,32 @@ final class OverlayView: NSView {
 
     // MARK: 绘制
 
-    /// 只画脏区：脏区换算成像素（向外取整），从上屏缓冲裁出子图画回原位（不复制整屏）。
+    /// 只画脏区：脏区换算成像素（向外取整），把这块像素复制出来画回原位。
+    /// 必须复制：系统在 draw 返回后才真正读取图像数据（实测晚 7–23ms），而核心下一次重绘会就地改写
+    /// 上屏缓冲（先回贴原图、再叠模糊），直接引用缓冲会读到重绘到一半的画面——拖动模糊时一闪一闪地变清晰。
     override func draw(_ dirtyRect: NSRect) {
         guard let ov = overlay, let ctx = NSGraphicsContext.current?.cgContext else { return }
         let img = airsnip_overlay_display(ov)
         guard let data = img.data, img.width > 0 else { return }
         let (w, h, stride) = (Int(img.width), Int(img.height), Int(img.stride))
-        guard
-            let provider = CGDataProvider(
-                dataInfo: nil, data: UnsafeRawPointer(data), size: stride * h, releaseData: { _, _, _ in }),
-            let full = CGImage(
-                width: w, height: h, bitsPerComponent: 8, bitsPerPixel: 32, bytesPerRow: stride, space: sRGB,
-                bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue),
-                provider: provider, decode: nil, shouldInterpolate: false, intent: .defaultIntent)
-        else { return }
         let x0 = max(0, Int((dirtyRect.minX * scale).rounded(.down)))
         let x1 = min(w, Int((dirtyRect.maxX * scale).rounded(.up)))
         let y0 = max(0, Int(((bounds.height - dirtyRect.maxY) * scale).rounded(.down)))
         let y1 = min(h, Int(((bounds.height - dirtyRect.minY) * scale).rounded(.up)))
-        guard x1 > x0, y1 > y0,
-            let part = full.cropping(to: CGRect(x: x0, y: y0, width: x1 - x0, height: y1 - y0))
+        guard x1 > x0, y1 > y0 else { return }
+        let row = (x1 - x0) * 4
+        var bytes = Data(count: row * (y1 - y0))
+        bytes.withUnsafeMutableBytes { dst in
+            for y in 0..<(y1 - y0) {
+                memcpy(dst.baseAddress! + y * row, data + (y0 + y) * stride + x0 * 4, row)
+            }
+        }
+        guard
+            let provider = CGDataProvider(data: bytes as CFData),
+            let part = CGImage(
+                width: x1 - x0, height: y1 - y0, bitsPerComponent: 8, bitsPerPixel: 32, bytesPerRow: row, space: sRGB,
+                bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue),
+                provider: provider, decode: nil, shouldInterpolate: false, intent: .defaultIntent)
         else { return }
         ctx.interpolationQuality = .none
         ctx.draw(part, in: viewRect(x: x0, y: y0, w: x1 - x0, h: y1 - y0))
