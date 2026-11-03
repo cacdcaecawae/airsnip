@@ -13,19 +13,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
     GetSystemMetrics, SM_CXVIRTUALSCREEN, SM_CYVIRTUALSCREEN, SM_XVIRTUALSCREEN, SM_YVIRTUALSCREEN,
 };
 
-/// 一次抓屏结果：整个虚拟屏幕的像素与原点。
-pub struct CapturedScreen {
-    /// 虚拟屏幕宽度（像素）。
-    pub width: u32,
-    /// 虚拟屏幕高度（像素）。
-    pub height: u32,
-    /// 虚拟屏幕左上角物理坐标 X（可为负，多显示器负坐标布局）。
-    pub origin_x: i32,
-    /// 虚拟屏幕左上角物理坐标 Y。
-    pub origin_y: i32,
-    /// RGBA 像素（供 tiny-skia），长度 width * height * 4。
-    pub rgba: Vec<u8>,
-}
+pub use airsnip_core::capture::CapturedScreen;
 
 /// 按 u32 批量交换 R/B 通道（BGRA ↔ RGBA），比逐字节快数倍。
 fn swap_rb(buf: &mut [u8]) {

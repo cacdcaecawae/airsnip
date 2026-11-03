@@ -12,9 +12,9 @@ use windows::Win32::Graphics::Gdi::{DeleteDC, DeleteObject, HBITMAP, HDC};
 use windows::Win32::UI::WindowsAndMessaging::*;
 use windows::core::w;
 
+use crate::overlay::dib::create_dib_surface;
 use crate::overlay::geometry::SelRect;
 use crate::overlay::shape::{paint_of, rounded_path};
-use crate::overlay::surface::create_dib_surface;
 use crate::overlay::ui::Ui;
 use crate::theme::Palette;
 

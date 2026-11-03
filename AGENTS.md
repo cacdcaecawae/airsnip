@@ -51,8 +51,9 @@
 - 编译检查：`cargo check`
 - 运行：`cargo run`（GUI 桌面程序，需 Windows 桌面会话；启动后托盘常驻，F1 截图 / F3 贴图）
 - 构建发布版：`cargo build --release`（已配 `lto="fat"`、`opt-level="z"`、`panic="abort"`、`strip=true`）
-- 测试：`cargo test`（当前 186 个：抓屏/剪贴板/对象模型与撤销栈/矢量栅格化/曲线与命中/文本测量与字体（粗斜体渲染、族间测量、未知族名回退）/系统字体枚举/长截图拼接/WebP/变换与手柄/光标映射/布局/字体面板/设置面板布局与 DPI 缩放/设置变更消息内存校验/图标 SVG 解析与视觉重量/圆角读写与手柄/圆角遮罩覆盖率与回贴）
-- 格式化检查：`cargo fmt --check`（提交前必须通过）
+- 测试：`cargo test`（workspace 默认成员 = 根包 + `airsnip-core`；Windows 当前 224 个：根包 76 + core 148（macOS 上 core 145；根包另有 3 个需手动触发的更新集成测试），覆盖抓屏/剪贴板/对象模型与撤销栈/矢量栅格化/曲线与命中/文本测量与字体（粗斜体渲染、族间测量、未知族名回退、多行、落点）/系统字体枚举/长截图拼接/WebP/变换与手柄/光标映射/布局/字体面板/设置面板布局与 DPI 缩放/设置变更消息内存校验/图标 SVG 解析与视觉重量/圆角读写与手柄/圆角遮罩覆盖率与回贴）；FFI 静态库另跑 `cargo test -p airsnip-macos`（12 个，仅 macOS）
+- 格式化检查：`cargo fmt --all --check`（提交前必须通过；`--all` 覆盖 workspace 内全部 crate）
+- macOS 版（移植中，见 `docs/macos-port.md`）：`cargo build -p airsnip-macos --profile release-macos` 构建静态库，再 `cd macos && swift build`；平台无关代码放 `crates/airsnip-core`，根包 `src/` 只放 Windows 外壳
 - 性能采集：`scripts/perf-capture.ps1`（热键延迟 + 帧耗时，需管理员）与 `scripts/perf.ps1`（待机 CPU/内存）；报告见 `docs/perf-m5.md`
 - 打包发布：`scripts/package.ps1`（构建 release → 校验体积/图标 → 输出 `dist\airsnip-v{版本}-win-x64.zip` 与自动更新用的 `.exe`）
 - 生成更新清单：`scripts/gen-latest-json.ps1 -Notes "说明"`（算 SHA-256 → 调 `update-sign` 签名 → 输出 `dist\latest.json`，需先跑 package.ps1）

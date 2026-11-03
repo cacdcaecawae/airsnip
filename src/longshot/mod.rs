@@ -1,21 +1,37 @@
 // SPDX-License-Identifier: GPL-3.0-only
 //! 长截图（LNG-1/3/4/5/6/7/10/11）：框选滚动视口 → 用户手动滚动 → 条带拼接 → 输出。
 //!
-//! 模块分工：`stitch` 条带匹配纯函数、`rows` 行缓冲画布、`engine` 拼接状态机、
-//! `session` 会话状态机、`window` 执行窗口、`bar` 状态条绘制、`present` 上屏、
-//! `preview` 拼接结果预览窗。
+//! 模块分工：拼接算法与会话状态机在 `airsnip_core::longshot`（`stitch`/`rows`/`engine`/`session`/`debug`），
+//! 本模块是 Windows 平台层：`ScreenSource` 屏幕帧源、`window` 执行窗口、`bar` 状态条绘制、
+//! `present` 上屏、`border` 视口边框、`preview` 拼接结果预览窗。
 
 mod bar;
 mod border;
-mod debug;
-mod engine;
 mod events;
 mod present;
 mod preview;
-mod rows;
-mod session;
-mod stitch;
 mod window;
+
+use airsnip_core::longshot::session;
+use airsnip_core::longshot::session::Source;
+
+/// 真实帧源：屏幕区域抓取（GDI）。
+struct ScreenSource {
+    x: i32,
+    y: i32,
+    w: u32,
+    h: u32,
+}
+
+impl Source for ScreenSource {
+    fn capture(&mut self) -> Result<Vec<u8>, String> {
+        let screen = crate::capture::capture_region(self.x, self.y, self.w, self.h)?;
+        if screen.rgba.len() != (self.w * self.h * 4) as usize {
+            return Err("抓帧尺寸不符".into());
+        }
+        Ok(screen.rgba)
+    }
+}
 
 use windows::Win32::Foundation::HINSTANCE;
 use windows::Win32::UI::WindowsAndMessaging::{MB_ICONERROR, MB_OK};

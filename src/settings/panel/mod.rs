@@ -25,7 +25,7 @@ use windows::Win32::UI::WindowsAndMessaging::*;
 use windows::core::{PCWSTR, w};
 
 use crate::app::{App, message_box};
-use crate::overlay::surface::convert_rgba_to_bgra;
+use crate::overlay::dib::convert_rgba_to_bgra;
 use crate::theme::{self, Palette};
 
 use controls::{RowId, Section, W};

@@ -1,4 +1,43 @@
-# AirSnip（轻截）
+# AirSnip（轻截）· macOS 版
+
+> 本仓库是 [AirSnip](https://github.com/bd-dxg/airsnip) 的 **macOS 移植版**，原作者 [冰冻大西瓜（@bd-dxg）](https://github.com/bd-dxg)。标注、拼接、编码等核心代码都出自原版；移植把平台无关的部分整理成共享核心，并新增了 C 接口层和 Swift 外壳。许可证同为 GPL-3.0。
+>
+> **Windows 用户请到[原仓库](https://github.com/bd-dxg/airsnip/releases)下载**，本仓库只发布 macOS 版。
+
+## macOS 版（预览）
+
+与 Windows 版共用同一套 Rust 核心（标注、拼接、编码是同一份代码），外壳用 Swift + AppKit：菜单栏常驻、ScreenCaptureKit 抓屏、系统输入法、原生设置窗口。要求 macOS 14 及以上、Apple 芯片。
+
+1. 从本仓库的 [Releases](https://github.com/cacdcaecawae/airsnip/releases) 下载 `airsnip-v*-macos-arm64.zip`，解压后把 `AirSnip.app` 拖进「应用程序」；也可以自行构建（见下）
+2. 第一次截图会请求「屏幕录制」权限：在「系统设置 › 隐私与安全性 › 屏幕与系统音频录制」里打开 AirSnip，然后退出并重新打开
+3. 菜单栏剪刀图标：截图 / 设置… / 退出；再次双击 `AirSnip.app` 也会打开设置
+4. 配置位置：`~/Library/Application Support/AirSnip/config.toml`；长截图与贴图右键「保存」存到 `~/Pictures/airsnip`
+
+**首次打开提示**：构建产物是临时签名、未经公证，下载后第一次打开会被系统拦下——到「系统设置 › 隐私与安全性」底部点「仍要打开」。
+
+与 Windows 版的差异：
+
+| | Windows | macOS |
+|---|---|---|
+| 截图 / 贴图热键 | `F1` / `F3` | `⌃⌘A` / `⌃⌥P`（设置里可改） |
+| 截图界面编辑键 | `Ctrl` 组合 | `⌘` 组合：`⌘C` 复制、`⌘S` 另存为、`⌘Z` / `⌘⇧Z` 撤销重做 |
+| 贴图 | `Ctrl`+滚轮透明度、`Ctrl+F3` 边框 | `⌘`+滚轮透明度、`⌃F3` 边框；也可双指捏合缩放 |
+| 多显示器 | 选区可跨屏 | 每块屏各自冻结，选区在一块屏内（同系统 `⌘⇧4`） |
+| 窗口识别 | 暂无 | 鼠标停在窗口上自动高亮，单击选中；桌面空白处单击 = 全屏；`⌘A` 全选 |
+| 长截图 | `Enter` 完成、`Ctrl+Z` 撤销 | `Return` 完成、`⌘Z` 撤销、`Esc` 取消 |
+
+```bash
+scripts/package-macos.sh                         # Rust 静态库 → swift build → dist/AirSnip.app（只需 Command Line Tools）
+cargo test -p airsnip-core -p airsnip-macos      # 核心与 C 接口单测
+```
+
+移植计划与各阶段验证记录见 `docs/macos-port.md`。
+
+---
+
+## 原版说明（Windows）
+
+以下是原版 README：功能、快捷键与 Windows 版的用法。macOS 版功能相同，按键差异见上表。
 
 **1 MB 的 Windows 截图标注工具。** 常驻内存 1.2 MB、待机 0% CPU、按热键 0.12 秒出画面——
 标注、二次编辑、长截图、贴图、多格式另存，功能一样不少。
@@ -123,7 +162,7 @@
 ```powershell
 cargo run                 # 开发版（不提权，可调试）
 cargo build --release     # 发布版（manifest 要求管理员权限，单文件）
-cargo test                # 单测（220 项）
+cargo test                # 单测（224 项）
 cargo fmt --check         # 格式化检查
 cargo deny check          # 依赖许可证 / 安全公告 / 来源检查
 pwsh scripts/package.ps1  # 打包 dist\airsnip-v{版本}-win-x64.zip / .exe
@@ -144,6 +183,7 @@ pwsh scripts/gen-latest-json.ps1 -Notes "说明"  # 生成并签名自动更新�
 - `screenshot-tool-PRD.md` — 完整需求与技术方案（性能红线、风险对策）
 - `docs/adr/` — 架构决策记录
 - `docs/perf-m5.md` — 性能实测数据与优化过程
+- `docs/macos-port.md` — macOS 移植计划与各阶段验证记录
 - `THIRD-PARTY.md` — 第三方组件声明
 - `Task/task_plan.md` · `Task/progress.md` · `Task/findings.md` — 开发计划、会话进度、技术踩坑
 

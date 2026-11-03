@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- __VERSION__ 由 scripts/package-macos.sh 替换为 Cargo.toml 的版本号 -->
+<plist version="1.0">
+<dict>
+    <key>CFBundleIdentifier</key>
+    <string>io.github.airsnip</string>
+    <key>CFBundleName</key>
+    <string>AirSnip</string>
+    <key>CFBundleDisplayName</key>
+    <string>AirSnip</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
+    <key>CFBundleExecutable</key>
+    <string>AirSnip</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>__VERSION__</string>
+    <key>CFBundleVersion</key>
+    <string>__VERSION__</string>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>zh_CN</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>14.0</string>
+    <!-- 菜单栏应用：无 Dock 图标、不出现在 ⌘Tab -->
+    <key>LSUIElement</key>
+    <true/>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <key>NSHumanReadableCopyright</key>
+    <string>AirSnip 轻截 · 原作者 冰冻大西瓜（bd-dxg）· GPL-3.0-only</string>
+</dict>
+</plist>

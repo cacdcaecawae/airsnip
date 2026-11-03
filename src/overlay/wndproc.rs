@@ -3,12 +3,13 @@
 
 use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::Graphics::Gdi::{BeginPaint, EndPaint, PAINTSTRUCT};
-use windows::Win32::UI::Input::Ime::{IME_COMPOSITION_STRING, ImmGetVirtualKey};
+use windows::Win32::UI::Input::Ime::{GCS_COMPSTR, GCS_RESULTSTR, IME_COMPOSITION_STRING, ImmGetVirtualKey};
 use windows::Win32::UI::Input::KeyboardAndMouse::{GetKeyState, SetFocus};
 use windows::Win32::UI::WindowsAndMessaging::*;
 
-use super::Overlay;
+use super::cursors::apply_now;
 use super::geometry::SelRect;
+use super::{Mods, Overlay};
 
 /// 自定义消息：显示后异步设置前台与输入焦点。
 /// `SetForegroundWindow` 在窗口刚显示时同步调用会阻塞至 ~45ms（前台锁定），
@@ -30,6 +31,12 @@ pub(super) unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARA
     }
     let Some(overlay) = app_from(hwnd) else {
         return unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) };
+    };
+    // 修饰键状态在每条消息处理前刷新（核心逻辑只读 `overlay.mods`）
+    // 空格：按住拖动可移动整个选区（CAP-2）
+    overlay.mods = Mods {
+        shift: shift_down(),
+        space: key_down(0x20),
     };
     match msg {
         WM_LBUTTONDOWN => {
@@ -74,20 +81,7 @@ pub(super) unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARA
         WM_LBUTTONDBLCLK => {
             let x = (lparam.0 & 0xFFFF) as u16 as i16 as i32;
             let y = ((lparam.0 >> 16) & 0xFFFF) as u16 as i16 as i32;
-            let edited = overlay
-                .hit_object(x, y)
-                .map(|i| overlay.begin_edit_text(i))
-                .unwrap_or(false);
-            let handled = if edited { true } else { overlay.reset_curve_at(x, y) };
-            if !handled {
-                // 双击第一击在选区内空白处按下（start_draw），作废草稿并完成截图
-                if let Some(sel) = overlay.selection {
-                    if sel.contains(x, y) && overlay.down_started_draw {
-                        overlay.draft = None;
-                        overlay.on_copy();
-                    }
-                }
-            }
+            overlay.on_double_click(x, y);
             LRESULT(0)
         }
         // 主动绘制，不靠系统擦除；只重绘无效区域
@@ -127,7 +121,7 @@ pub(super) unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARA
         }
         // 光标形状随鼠标位置决定（手柄方向 / 对象移动 / 十字），见 `cursor::cursor_at`
         WM_SETCURSOR => {
-            overlay.apply_cursor_now(hwnd);
+            apply_now(overlay, hwnd);
             LRESULT(1)
         }
         WM_KEYDOWN => {
@@ -147,7 +141,7 @@ pub(super) unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARA
             };
             // 空格按下立即刷新光标：系统只在鼠标移动时发 WM_SETCURSOR，不能等它
             if vk == 0x20 {
-                overlay.apply_cursor_now(hwnd);
+                apply_now(overlay, hwnd);
                 return LRESULT(0);
             }
             match vk {
@@ -164,7 +158,7 @@ pub(super) unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARA
                 0x43 if ctrl_down() => overlay.on_copy(), // Ctrl+C
                 0x53 if ctrl_down() => overlay.on_save(), // Ctrl+S 保存（弹另存为对话框）
                 // 长截图键（默认 S，设置面板可改）：当前选区作为滚动视口（M4）
-                k if k == overlay.longshot_key => overlay.on_longshot(),
+                k if k == overlay.longshot_key() => overlay.on_longshot(),
                 0x5A if ctrl_down() => {
                     // Ctrl+Z 撤销 / Ctrl+Shift+Z 重做（EDT-7）
                     if shift_down() {
@@ -200,7 +194,11 @@ pub(super) unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARA
         WM_IME_STARTCOMPOSITION => LRESULT(0),
         WM_IME_COMPOSITION => {
             if overlay.is_editing_text() {
-                overlay.on_text_composition(lparam.0 as u32);
+                // 有结果串则提交，否则读组合串（候选）
+                let flags = lparam.0 as u32;
+                let result = (flags & GCS_RESULTSTR.0 != 0).then(|| ime_string(hwnd, GCS_RESULTSTR));
+                let comp = (result.is_none() && flags & GCS_COMPSTR.0 != 0).then(|| ime_string(hwnd, GCS_COMPSTR));
+                overlay.on_text_composition(result, comp);
             }
             LRESULT(0)
         }
@@ -213,7 +211,7 @@ pub(super) unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARA
         WM_KEYUP => {
             // 空格松开：光标回到按当前位置判定的形状
             if wparam.0 as u32 == 0x20 {
-                overlay.apply_cursor_now(hwnd);
+                apply_now(overlay, hwnd);
             }
             LRESULT(0)
         }
@@ -242,17 +240,12 @@ fn ctrl_down() -> bool {
 }
 
 /// Shift 是否按下（文本输入修饰键 / 绘制约束 EDT-1·EDT-2）。
-pub(super) fn shift_down() -> bool {
+fn shift_down() -> bool {
     key_down(0x10)
 }
 
-/// 空格键是否按下（按住空格拖动可移动整个选区，CAP-2）。
-pub(super) fn space_down() -> bool {
-    key_down(0x20)
-}
-
 /// 从 IME 上下文读取组合串/结果串（UTF-16 → String，EDT-4）。
-pub(super) fn ime_string(hwnd: HWND, what: IME_COMPOSITION_STRING) -> String {
+fn ime_string(hwnd: HWND, what: IME_COMPOSITION_STRING) -> String {
     unsafe {
         use windows::Win32::UI::Input::Ime::{ImmGetCompositionStringW, ImmGetContext, ImmReleaseContext};
         let ctx = ImmGetContext(hwnd);

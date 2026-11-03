@@ -39,36 +39,6 @@ pub const WM_PIN_BORDER_CHANGED: u32 = WM_APP + 5;
 /// 截图覆盖层是否在运行（跨线程；截图期间撤销全局贴图热键）。
 static OVERLAY_RUNNING: AtomicBool = AtomicBool::new(false);
 
-/// 覆盖层保存时选定的格式扩展名（OUT-2）：覆盖层线程写，主线程在截图结束时写回配置。
-static LAST_SAVE_EXT: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(None);
-
-/// 覆盖层保存时选定的目录（OUT-2）：覆盖层线程写，主线程在截图结束时写回配置。
-static LAST_SAVE_DIR: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(None);
-
-/// 记录本次保存用的格式扩展名（覆盖层线程调用）。
-pub fn last_save_ext_store(ext: &str) {
-    if let Ok(mut g) = LAST_SAVE_EXT.lock() {
-        *g = Some(ext.to_ascii_lowercase());
-    }
-}
-
-/// 取出并清空记录的扩展名（主线程写回配置用）。
-fn last_save_ext_take() -> Option<String> {
-    LAST_SAVE_EXT.lock().ok().and_then(|mut g| g.take())
-}
-
-/// 记录本次保存所在的目录（覆盖层线程调用，OUT-2）。
-pub fn last_save_dir_store(dir: &std::path::Path) {
-    if let Ok(mut g) = LAST_SAVE_DIR.lock() {
-        *g = Some(dir.to_string_lossy().into_owned());
-    }
-}
-
-/// 取出并清空记录的目录（主线程写回配置用）。
-fn last_save_dir_take() -> Option<String> {
-    LAST_SAVE_DIR.lock().ok().and_then(|mut g| g.take())
-}
-
 pub const ID_TRAY: u32 = 1;
 pub const ID_HOTKEY_SHOT: i32 = 101;
 pub const ID_HOTKEY_PIN: i32 = 102;
@@ -211,7 +181,7 @@ impl App {
             let main_hwnd = HWND(main_hwnd as *mut _);
             match crate::capture::capture_virtual_screen() {
                 Ok(screen) => {
-                    let result = crate::overlay::Overlay::run(
+                    let result = crate::overlay::run(
                         screen,
                         palette,
                         tool_keys,

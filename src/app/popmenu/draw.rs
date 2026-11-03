@@ -8,8 +8,8 @@ use windows::Win32::UI::WindowsAndMessaging::{GetWindowRect, ULW_ALPHA, UpdateLa
 
 use super::super::super::overlay::geometry::SelRect;
 use crate::editor::Point as FPoint;
+use crate::overlay::dib::convert_rgba_to_bgra;
 use crate::overlay::shape::rounded_rect;
-use crate::overlay::surface::convert_rgba_to_bgra;
 use crate::render::text as dwrite;
 
 use super::{CORNER, Ctx, ITEM_H, PAD_X, SEP_H};

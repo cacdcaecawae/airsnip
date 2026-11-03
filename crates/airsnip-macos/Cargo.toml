@@ -1,0 +1,14 @@
+[package]
+name = "airsnip-macos"
+version = "0.7.0"
+edition = "2024"
+description = "AirSnip 轻截 macOS 静态库：共享核心的 C ABI（Swift 外壳通过 include/airsnip.h 调用）"
+license = "GPL-3.0-only"
+publish = false
+
+[lib]
+crate-type = ["staticlib"]
+
+[dependencies]
+airsnip-core = { path = "../airsnip-core", version = "0.7.0" }
+tiny-skia = "0.12.0"

@@ -115,7 +115,8 @@ pub fn run(
     ui_scale: crate::settings::UiScale,
     save: crate::settings::SavePrefs,
 ) -> Option<Outcome> {
-    let session = match Session::new(x, y, w, h, max_height) {
+    let source = Box::new(super::ScreenSource { x, y, w, h });
+    let session = match Session::with_source(source, w, h, max_height) {
         Ok(s) => s,
         Err(e) => {
             crate::app::message_box(None, &format!("长截图初始化失败：{e}"), MB_OK | MB_ICONERROR);
@@ -181,7 +182,7 @@ pub fn run(
         // 执行窗口禁输入法：中文 IME 会截走 Enter/Esc/Space 等按键。
         let _ = ImmAssociateContext(hwnd, HIMC(std::ptr::null_mut()));
 
-        let (mem_dc, dib_bmp, dib_bits) = crate::overlay::surface::create_dib_surface(bw as u32, bh as u32).ok()?;
+        let (mem_dc, dib_bmp, dib_bits) = crate::overlay::dib::create_dib_surface(bw as u32, bh as u32).ok()?;
         let win = Box::new(Win {
             session: Box::new(session),
             border_hwnd,

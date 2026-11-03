@@ -5,24 +5,35 @@ edition = "2024"
 description = "AirSnip 轻截：轻量原生截图与标注工具（Windows，纯 CPU 渲染）"
 license = "GPL-3.0-only"
 
+# 根包是 Windows 外壳；共享核心在 crates/airsnip-core，macOS 静态库在 crates/airsnip-macos
+# （由 scripts/package-macos.sh 显式构建，不在默认成员内）。
+[workspace]
+members = [".", "crates/airsnip-core", "crates/airsnip-macos"]
+default-members = [".", "crates/airsnip-core"]
+
 [profile.release]
 lto = "fat"
 opt-level = "z"
 panic = "abort"
 strip = true
 
-[dependencies]
+# macOS 静态库：FFI 边界用 catch_unwind 把 panic 转成错误码，需要 unwind；
+# 符号由最终 App 链接时处理，静态库本身不剥离。
+[profile.release-macos]
+inherits = "release"
+panic = "unwind"
+strip = false
+
+[target.'cfg(windows)'.dependencies]
+airsnip-core = { path = "crates/airsnip-core", version = "0.7.0" }
 # 自动更新（#59）：验签（ed25519 + sha256）与清单解析
 ed25519-dalek = { version = "2.2.0", default-features = false, features = ["std", "zeroize", "rand_core"] }
 sha2 = { version = "0.10.9", default-features = false }
-serde_json = "1.0.145"
-image-webp = "0.2.4"
-jpeg-encoder = "0.7.1"
-png = "0.18.1"
 serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.145"
+png = "0.18.1"
 tiny-skia = "0.12.0"
-toml = "1.1.6"
-windows = { version = "0.62.2", features = ["Win32_Foundation", "Win32_System_Threading", "Win32_System_Registry", "Win32_System_LibraryLoader", "Win32_System_Com", "Win32_UI_WindowsAndMessaging", "Win32_UI_HiDpi", "Win32_UI_Shell", "Win32_UI_Shell_Common", "Win32_UI_Controls", "Win32_UI_Input_KeyboardAndMouse", "Win32_UI_Input_Ime", "Win32_Security", "Win32_Graphics_Gdi", "Win32_Graphics_Dwm", "Win32_Graphics_DirectWrite", "Win32_System_DataExchange", "Win32_System_Memory", "Win32_UI_Controls_Dialogs", "Win32_System_SystemInformation", "Win32_System_Ole", "Win32_Networking_WinHttp"] }
+windows = { version = "0.62.2", features = ["Win32_Foundation", "Win32_System_Threading", "Win32_System_Registry", "Win32_System_LibraryLoader", "Win32_System_Com", "Win32_UI_WindowsAndMessaging", "Win32_UI_HiDpi", "Win32_UI_Shell", "Win32_UI_Shell_Common", "Win32_UI_Controls", "Win32_UI_Input_KeyboardAndMouse", "Win32_UI_Input_Ime", "Win32_Security", "Win32_Graphics_Gdi", "Win32_Graphics_Dwm", "Win32_System_DataExchange", "Win32_System_Memory", "Win32_UI_Controls_Dialogs", "Win32_System_SystemInformation", "Win32_System_Ole", "Win32_Networking_WinHttp"] }
 # implement 宏展开需要 windows_core crate 在 crate root 可见（COM 自定义接口）
 windows-core = { version = "0.62.2", default-features = false, features = ["std"] }
 

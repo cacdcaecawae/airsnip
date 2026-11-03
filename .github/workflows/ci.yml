@@ -1,0 +1,31 @@
+# SPDX-License-Identifier: GPL-3.0-only
+# 持续集成：Windows 与 macOS 各自测试、构建；macOS 产出 AirSnip.app（zip，临时签名）作为构建产物供下载试用。
+name: CI
+
+on:
+  push:
+    branches: [main, "feat/**"]
+  pull_request:
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup toolchain install stable --profile minimal -c rustfmt && rustup default stable
+      - run: cargo fmt --all --check
+      - run: cargo test
+      - run: cargo build --release
+
+  macos:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup toolchain install stable --profile minimal && rustup default stable
+      - run: cargo test -p airsnip-core -p airsnip-macos
+      - run: scripts/package-macos.sh
+      - run: dist/AirSnip.app/Contents/MacOS/AirSnip --selftest
+      - uses: actions/upload-artifact@v4
+        with:
+          name: airsnip-macos-arm64
+          path: dist/*.zip

@@ -43,10 +43,10 @@ fn save_as(win: &mut Win, hwnd: HWND) {
         Some(path) => {
             // 记住本次格式与目录：下次对话框默认选中/定位（OUT-2）
             if let Some(e) = path.extension().and_then(|e| e.to_str()) {
-                crate::app::last_save_ext_store(e);
+                crate::settings::last_save_ext_store(e);
             }
             if let Some(parent) = path.parent() {
-                crate::app::last_save_dir_store(parent);
+                crate::settings::last_save_dir_store(parent);
             }
             win.save_as = Some(path);
             win.done = true;

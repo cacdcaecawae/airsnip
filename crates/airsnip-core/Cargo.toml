@@ -1,0 +1,21 @@
+[package]
+name = "airsnip-core"
+version = "0.7.0"
+edition = "2024"
+description = "AirSnip 轻截共享核心：标注模型、tiny-skia 渲染、长截图拼接、图片编码与配置模型"
+license = "GPL-3.0-only"
+publish = false
+
+[dependencies]
+image-webp = "0.2.4"
+jpeg-encoder = "0.7.1"
+png = "0.18.1"
+serde = { version = "1.0.229", features = ["derive"] }
+tiny-skia = "0.12.0"
+toml = "1.1.6"
+
+# 文字后端（render::text::dwrite）、界面缩放的显示器查询（overlay::ui）、本地时间（output）
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.62.2", features = ["Win32_Foundation", "Win32_Graphics_Gdi", "Win32_Graphics_DirectWrite", "Win32_UI_HiDpi", "Win32_UI_WindowsAndMessaging", "Win32_System_SystemInformation"] }
+# implement 宏展开需要 windows_core crate 在 crate root 可见（COM 自定义接口）
+windows-core = { version = "0.62.2", default-features = false, features = ["std"] }

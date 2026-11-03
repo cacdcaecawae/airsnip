@@ -7,9 +7,11 @@ use windows::Win32::Graphics::Gdi::HBRUSH;
 use windows::Win32::UI::WindowsAndMessaging::*;
 use windows::core::{PCWSTR, w};
 
+use crate::settings::{last_save_dir_take, last_save_ext_take};
+
 use super::{
     App, TIMER_UPDATE_CHECK, WINDOW_CLASS, WM_OVERLAY_DONE, WM_PIN_BORDER_CHANGED, WM_PIN_FROM_EDITOR, WM_TRAY,
-    icon_resource, last_save_dir_take, last_save_ext_take, tray,
+    icon_resource, tray,
 };
 
 /// 注册消息窗口类并创建窗口（隐藏）。

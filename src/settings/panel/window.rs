@@ -8,7 +8,7 @@ use windows::Win32::UI::WindowsAndMessaging::*;
 use windows::core::{PCWSTR, w};
 
 use crate::app::icon_resource;
-use crate::overlay::surface::create_dib_surface;
+use crate::overlay::dib::create_dib_surface;
 use crate::overlay::ui::Ui;
 
 use super::controls::{self, Section, W};

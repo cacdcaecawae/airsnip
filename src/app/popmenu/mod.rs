@@ -17,7 +17,7 @@ use windows::Win32::UI::Input::KeyboardAndMouse::SetFocus;
 use windows::Win32::UI::WindowsAndMessaging::*;
 use windows::core::{PCWSTR, w};
 
-use crate::overlay::surface::create_dib_surface;
+use crate::overlay::dib::create_dib_surface;
 
 pub(super) const WINDOW_CLASS: PCWSTR = w!("airsnip.popmenu");
 /// 单位（未缩放）行高。

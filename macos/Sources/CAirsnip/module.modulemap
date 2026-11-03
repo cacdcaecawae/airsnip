@@ -1,0 +1,5 @@
+module CAirsnip [system] {
+    header "shim.h"
+    link "airsnip_macos"
+    export *
+}

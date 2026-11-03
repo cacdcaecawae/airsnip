@@ -3,7 +3,7 @@
 # 许可白名单与 THIRD-PARTY.md 的分组保持一致；新增依赖若不在白名单内会直接报错。
 
 [graph]
-targets = [{ triple = "x86_64-pc-windows-msvc" }]
+targets = [{ triple = "x86_64-pc-windows-msvc" }, { triple = "aarch64-apple-darwin" }]
 
 [advisories]
 version = 2
